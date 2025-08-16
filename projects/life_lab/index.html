@@ -1,0 +1,65 @@
+<!doctype html><html lang='en'><head>
+<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Game of Life Studio</title><link rel='stylesheet' href='../../assets/css/style.css'></head><body>
+<header class='nav'><div class='container'><a class='brand' href='../../index.html'>&larr; Back</a><button id='theme' class='btn'>Theme</button></div></header>
+<section class='container prose'>
+  <h2>Game of Life Studio</h2>
+  <p><strong>What you see:</strong> a cellular automaton that evolves from simple rules into gliders, oscillators, and guns.</p>
+  <p><strong>How to use:</strong> click/drag to draw; Random for noise; choose a pattern (Glider/Pulsar/Gosper); Play to run; adjust speed; toggle Wrap to flow across edges.</p>
+  
+<div class="controls">
+  <button class="btn" id="play">Play</button>
+  <button class="btn" id="step">Step</button>
+  <button class="btn" id="clear">Clear</button>
+  <button class="btn" id="random">Random</button>
+  <select id="pattern">
+    <option value="glider">Glider</option>
+    <option value="pulsar">Pulsar</option>
+    <option value="gosper">Gosper Gun</option>
+  </select>
+  <label>Speed <input id="spd" type="range" min="1" max="20" value="8"></label>
+  <label>Wrap <input id="wrap" type="checkbox" checked></label>
+</div>
+<canvas id="life" width="900" height="520" class="stage"></canvas>
+<p><small class="mono">Click/drag to draw cells. Classic rules: a live cell with 2–3 neighbours survives; empty cell with exactly 3 becomes alive.</small></p>
+
+</section>
+<footer><div class='container'>Contact: <a href='mailto:ambrosetheshield6@gmail.com'>ambrosetheshield6@gmail.com</a></div></footer>
+<script>document.getElementById('theme').onclick=()=>document.documentElement.classList.toggle('light');</script>
+
+<script>
+const cv=document.getElementById('life'), ctx=cv.getContext('2d');
+const CS=6; // cell size px
+const W=Math.floor(cv.width/CS), H=Math.floor(cv.height/CS);
+let A=new Uint8Array(W*H), B=new Uint8Array(W*H), running=false, timer=null;
+function id(x,y){return y*W+x}
+function inside(x,y){return x>=0&&x<W&&y>=0&&y<H}
+function neigh(x,y){let s=0; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){ if(dx||dy){ let xx=x+dx, yy=y+dy; if(document.getElementById('wrap').checked){ xx=(xx+W)%W; yy=(yy+H)%H; } if(inside(xx,yy)) s+=A[id(xx,yy)]; } } return s; }
+function draw(){ ctx.fillStyle='#0c142b'; ctx.fillRect(0,0,cv.width,cv.height); ctx.fillStyle='#6aa8ff'; for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(A[id(x,y)]) ctx.fillRect(x*CS,y*CS,CS-1,CS-1); }
+function step(){ B.set(A); for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const n=neigh(x,y), i=id(x,y); const alive=B[i]===1; A[i] = (alive?(n===2||n===3):(n===3))?1:0; } draw(); }
+function play(){ if(running){running=false; return} running=true; const tick=()=>{ if(!running) return; step(); setTimeout(()=>requestAnimationFrame(tick), Math.max(10, 220-(+document.getElementById('spd').value*10))); }; tick(); }
+function clear(){ A.fill(0); draw(); }
+function randomize(){ for(let i=0;i<A.length;i++) A[i]=(Math.random()<0.18)?1:0; draw(); }
+function place(pattern){ const cx=Math.floor(W/2), cy=Math.floor(H/2); const set=(x,y)=>{ if(inside(cx+x,cy+y)) A[id(cx+x,cy+y)]=1; };
+  if(pattern==='glider'){ [[0,1],[1,2],[2,0],[2,1],[2,2]].forEach(([x,y])=>set(x,y)); }
+  if(pattern==='pulsar'){ const pts=[[2,0],[3,0],[4,0],[8,0],[9,0],[10,0],[0,2],[5,2],[7,2],[12,2],[0,3],[5,3],[7,3],[12,3],[0,4],[5,4],[7,4],[12,4],[2,5],[3,5],[4,5],[8,5],[9,5],[10,5],
+                                [2,7],[3,7],[4,7],[8,7],[9,7],[10,7],[0,8],[5,8],[7,8],[12,8],[0,9],[5,9],[7,9],[12,9],[0,10],[5,10],[7,10],[12,10],[2,12],[3,12],[4,12],[8,12],[9,12],[10,12]];
+                     pts.forEach(([x,y])=>set(x-6,y-6)); }
+  if(pattern==='gosper'){ const pts=[[1,5],[2,5],[1,6],[2,6],[13,5],[14,5],[12,6],[16,6],[11,7],[17,7],[11,8],[15,8],[17,8],[18,8],[11,9],[17,9],[12,10],[16,10],[13,11],[14,11],
+                                 [21,7],[22,7],[21,8],[22,8],[23,6],[23,10],[25,5],[25,6],[25,10],[25,11],[35,7],[36,7],[35,8],[36,8]];
+                     pts.forEach(([x,y])=>set(x-20,y-10)); }
+  draw();
+}
+let painting=false;
+cv.addEventListener('mousedown',e=>{painting=true; const r=cv.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/CS), y=Math.floor((e.clientY-r.top)/CS); A[id(x,y)] = A[id(x,y)]?0:1; draw();});
+cv.addEventListener('mousemove',e=>{ if(!painting) return; const r=cv.getBoundingClientRect(); const x=Math.floor((e.clientX-r.left)/CS), y=Math.floor((e.clientY-r.top)/CS); A[id(x,y)]=1; draw(); });
+window.addEventListener('mouseup',()=>painting=false);
+document.getElementById('play').onclick=play;
+document.getElementById('step').onclick=step;
+document.getElementById('clear').onclick=clear;
+document.getElementById('random').onclick=randomize;
+document.getElementById('pattern').onchange=e=>{place(e.target.value)};
+draw();
+</script>
+
+</body></html>

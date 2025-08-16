@@ -1,0 +1,128 @@
+<!doctype html><html lang='en'><head>
+<meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Universe Geometry Playground</title><link rel='stylesheet' href='../../assets/css/style.css'></head><body>
+<header class='nav'><div class='container'><a class='brand' href='../../index.html'>&larr; Back</a><button id='theme' class='btn'>Theme</button></div></header>
+<section class='container prose'>
+  <h2>Universe Geometry Playground</h2>
+  <p><strong>What you see:</strong> thousands of stars rendered in 3D and projected to 2D. Switch between a spiral galaxy, a sphere, a torus, or a hollow void.</p>
+  <p><strong>How to use:</strong> pick a shape; drag to orbit; tweak Count/Rotate/Noise/Spread and Arms (for galaxy); Regenerate to rebuild the geometry.</p>
+  
+<div class="controls">
+  <select id="shape">
+    <option value="galaxy">Spiral Galaxy</option>
+    <option value="sphere">Sphere</option>
+    <option value="torus">Torus</option>
+    <option value="void">Random Void</option>
+  </select>
+  <label>Count <input id="count" type="range" min="500" max="6000" value="2500"></label>
+  <label>Rotate <input id="rot" type="range" min="0" max="3" step="0.01" value="0.6"></label>
+  <label>Noise <input id="noise" type="range" min="0" max="1.2" step="0.02" value="0.2"></label>
+  <label>Spread <input id="spread" type="range" min="0.2" max="2.0" step="0.02" value="1.0"></label>
+  <label>Arms <input id="arms" type="range" min="2" max="6" value="3"></label>
+  <select id="pal">
+    <option value="cool">Cool</option>
+    <option value="warm">Warm</option>
+    <option value="neon">Neon</option>
+  </select>
+  <button class="btn" id="regen">Regenerate</button>
+</div>
+<canvas id="univ" width="900" height="520" class="stage"></canvas>
+<p><small class="mono">Drag to orbit. Depth shading makes nearer stars larger/brighter.</small></p>
+
+</section>
+<footer><div class='container'>Contact: <a href='mailto:ambrosetheshield6@gmail.com'>ambrosetheshield6@gmail.com</a></div></footer>
+<script>document.getElementById('theme').onclick=()=>document.documentElement.classList.toggle('light');</script>
+
+<script>
+const cv=document.getElementById('univ'), ctx=cv.getContext('2d');
+let pts=[], rotX=0, rotY=0, dragging=false, lastX=0, lastY=0;
+cv.addEventListener('mousedown',e=>{dragging=true; lastX=e.clientX; lastY=e.clientY;});
+window.addEventListener('mouseup',()=>dragging=false);
+cv.addEventListener('mousemove',e=>{ if(!dragging) return; const dx=e.clientX-lastX, dy=e.clientY-lastY; rotY += dx*0.005; rotX += dy*0.005; lastX=e.clientX; lastY=e.clientY; });
+function R(){ return Math.random(); }
+function gaussian(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function palette(t){ const pal=document.getElementById('pal').value; let r,g,b;
+  if(pal==='cool'){ r=100+120*t; g=160+80*(1-t); b=220; }
+  if(pal==='warm'){ r=220; g=160*t; b=80*(1-t); }
+  if(pal==='neon'){ r=120+135*Math.sin(6*t); g=120+135*Math.sin(6*t+2); b=120+135*Math.sin(6*t+4); }
+  return [r|0,g|0,b|0];
+}
+function build(){
+  const shape=document.getElementById('shape').value;
+  const N=+document.getElementById('count').value;
+  const spread=+document.getElementById('spread').value;
+  const noise=+document.getElementById('noise').value;
+  const arms=+document.getElementById('arms').value;
+  pts=[];
+  if(shape==='sphere'){
+    // Fibonacci sphere
+    for(let i=0;i<N;i++){
+      const k = 2*i/N-1;
+      const phi = i * (Math.PI * (3 - Math.sqrt(5)));
+      const r = Math.sqrt(1-k*k);
+      let x = r*Math.cos(phi), y = k, z = r*Math.sin(phi);
+      x*=spread; y*=spread; z*=spread;
+      x+=noise*gaussian(); y+=noise*gaussian(); z+=noise*gaussian();
+      pts.push({x,y,z,c: (y+1)/2 });
+    }
+  } else if(shape==='torus'){
+    const R=1.0*spread, r=0.4*spread;
+    for(let i=0;i<N;i++){
+      const u=2*Math.PI*(i/N), v=2*Math.PI*((i*1.618)%1);
+      let x=(R+r*Math.cos(v))*Math.cos(u), y=r*Math.sin(v), z=(R+r*Math.cos(v))*Math.sin(u);
+      x+=noise*gaussian(); y+=noise*gaussian(); z+=noise*gaussian();
+      pts.push({x,y,z,c:(Math.cos(v)*0.5+0.5)});
+    }
+  } else if(shape==='galaxy'){
+    const armsN=arms, swirl=2.8*spread, rad=1.2*spread;
+    for(let i=0;i<N;i++){
+      const r = rad*Math.pow(R(),0.5); // denser core
+      const arm = (i%armsN)/armsN;
+      const angle = arm*2*Math.PI + r*swirl + gaussian()*0.15;
+      let x = r*Math.cos(angle) + gaussian()*noise*0.2;
+      let y = (gaussian()*0.05) + gaussian()*noise*0.1;
+      let z = r*Math.sin(angle) + gaussian()*noise*0.2;
+      const t = r/(rad+1e-6);
+      pts.push({x,y,z,c:1-t});
+    }
+  } else { // void
+    for(let i=0;i<N;i++){
+      let x=(R()*2-1)*spread, y=(R()*2-1)*spread, z=(R()*2-1)*spread;
+      if(Math.hypot(x,y,z)<0.4*spread) { i--; continue; } // hollow center
+      x+=noise*gaussian(); y+=noise*gaussian(); z+=noise*gaussian();
+      const t = Math.min(1, Math.hypot(x,y,z)/spread);
+      pts.push({x,y,z,c:t});
+    }
+  }
+}
+function project(p){
+  // rotate in 3D then project
+  const a=rotX, b=rotY;
+  let x=p.x, y=p.y, z=p.z;
+  // Rx
+  let cy=Math.cos(a), sy=Math.sin(a), cz=Math.cos(b), sz=Math.sin(b);
+  let y1 = y*cy - z*sy, z1 = y*sy + z*cy;
+  let x2 = x*cz + z1*sz, z2 = -x*sz + z1*cz;
+  const d = 3.0, f = 360; const w = f/(d - z2);
+  return {x: cv.width/2 + x2*w, y: cv.height/2 + y1*w, w, depth:z2};
+}
+function draw(){
+  ctx.fillStyle='rgba(12,20,43,0.35)'; ctx.fillRect(0,0,cv.width,cv.height);
+  const rot = +document.getElementById('rot').value;
+  rotY += rot*0.0025;
+  pts.forEach(p=>{
+    const pr = project(p);
+    const t = Math.max(0, Math.min(1, (pr.depth+2)/4 ));
+    const [r,g,b] = palette(p.c*0.7 + 0.3*t);
+    const size = Math.max(1, pr.w*1.2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${0.8*t+0.2})`;
+    ctx.beginPath(); ctx.arc(pr.x, pr.y, size, 0, 6.283); ctx.fill();
+  });
+  requestAnimationFrame(draw);
+}
+document.getElementById('regen').onclick=()=>{build()};
+['shape','count','noise','spread','arms'].forEach(id=> document.getElementById(id).addEventListener('input', build));
+build(); draw();
+</script>
+
+</body></html>
